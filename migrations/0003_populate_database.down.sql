@@ -1,0 +1,1 @@
+DELETE FROM "features" WHERE "application" = ANY('{my-app-1,my-app-2}');

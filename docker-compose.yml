@@ -1,0 +1,62 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: app.dockerfile
+    environment:
+      DATABASE_NAME: features-db
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_USER: features-user
+      DATABASE_PASS: features-pass
+      REDIS_HOST: cache
+      REDIS_PORT: 6379
+      REDIS_DB_NUM: 1
+      REDIS_IS_SENTINEL: 'false'
+    ports:
+      - '8000:8000'
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+      apply-migrations:
+        condition: service_started
+
+  db:
+    image: postgres:11.3
+    restart: always
+    environment:
+      POSTGRES_DB: features-db
+      POSTGRES_USER: features-user
+      POSTGRES_PASSWORD: features-pass
+    ports:
+      - 5432:5432
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U features-user -d features-db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cache:
+    image: redis:5-alpine
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    volumes:
+      - redis-data:/data
+
+  apply-migrations:
+    image: migrate/migrate
+    volumes:
+        - ./migrations:/migrations
+    command: ["-path", "/migrations", "-database", "postgres://features-user:features-pass@db:5432/features-db?sslmode=disable", "up"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pg-data:
+  redis-data:
